@@ -15,6 +15,58 @@ tracker = cv.TrackerKCF_create()
 bbox = cv.selectROI(frame, False)
 ok = tracker.init(frame, bbox)
 
+# Function that returns the average distance of pixels that are in the bounding box
+def distance_approximator(depth, start_point, end_point):
+    # defining the range of the bounding box, and the distance list to sum distance of pixels
+    start_y = start_point[1]
+    end_y = end_point[1]
+    start_x = start_point[0]
+    end_x = end_point[0]
+    distance = []
+    coverage = [0]*64
+
+
+    # test string to make sure that we are targeting the bounding box for distance
+    # print("X range: ", start_x, end_x, "Y range: ", start_y, end_y)
+
+
+    # Aproxximation of the average distance by taking the 4 corners of the bounding box
+    # distance.append(depth.get_distance(start_x, start_y))
+    # distance.append(depth.get_distance(start_x, end_y))
+    # distance.append(depth.get_distance(end_x, end_y))
+    # distance.append(depth.get_distance(end_x, start_y))
+
+
+    # NOTE: This method isn't the most efficient.Especially for larger bounding boxes. If lag is too much, then uncomment above and use that process instead. 
+    for y in range(start_y, end_y):
+        for x in range(start_x, end_x):
+            distance.append(depth.get_distance(x, y))
+            dist = depth.get_distance(x, y)
+            if 0 < dist and dist < 1:
+                coverage[x//10] += 1
+
+        if y%20 is 19:
+            line = ""
+            for c in coverage:
+                line += " .:nhBXWW"[c//25]
+            coverage = [0]*64
+            # print(line)
+
+    # Averaging the distance of the pixels
+    average_dist = sum(distance)
+    average_dist = average_dist/len(distance)
+
+
+    
+
+    # Writes ditance to screen
+    distance_string = str(round(average_dist, 3))
+    cv.putText(color_image, "Distance to Object: " + distance_string, (100,80), cv.FONT_HERSHEY_SIMPLEX, 0.75,(50,170,50),2)
+
+    # Return value to use in the tracking frame
+    return round(average_dist, 3)
+
+
 # Get device product line for setting a supporting resolution
 pipeline_wrapper = rs.pipeline_wrapper(pipeline)
 pipeline_profile = config.resolve(pipeline_wrapper)
@@ -73,14 +125,21 @@ while True:
     blackImg = np.zeros(depth_colormap_dim)
 
     #TODO: Use the hstack and vstack methods to add this to the 'Realsense' cv window
-    cv.imshow('Tracking', blackImg)
     
+    # print(depth_colormap_dim)
             
 
 ########################################################################
     # Tracking
 #######################################################################
+    # Create the camera representation on the depth tracking frame. Values are hardcoded rn. Should fix but low priority
 
+    #TODO: Draw the camera on tracking frame
+    
+    
+    # p1 = (200, 620)
+    # p2 = (245, 640)
+    # cv.rectangle(blackImg, p1, p2, (0,0,255), -1)
     # Get info for the Tracker
     frame = frames.get_color_frame()
     timer = cv.getTickCount()
@@ -95,6 +154,7 @@ while True:
             # Tracking success
             p1 = (int(bbox[0]), int(bbox[1]))
             p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
+            distance_approximator(depth_frame, p1, p2)
             cv.rectangle(color_image, p1, p2, (255,0,0), 2, 1)
     else :
         # Tracking failure
@@ -125,6 +185,7 @@ while True:
 
     # cv.imshow("Original Video Capture", color_image)
     cv.imshow('RealSense', images)
+    cv.imshow('Tracking', blackImg)
     key = cv.waitKey(1)
     if key == 27:
         break
